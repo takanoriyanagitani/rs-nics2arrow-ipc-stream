@@ -1,0 +1,33 @@
+[package]
+name = "rs-nics2arrow-ipc-stream"
+version = "0.1.0"
+edition = "2024"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+
+[[bin]]
+name = "nics2arrow-ipc-stream"
+
+[dependencies.netdev]
+version = "0"
+default-features = false
+features = [
+	"gateway",
+	"serde",
+]
+
+[dependencies.clap]
+version = "4"
+features = ["derive"]
+
+[dependencies.arrow]
+version = "57"
+default-features = false
+features = [
+	"ipc",
+]
