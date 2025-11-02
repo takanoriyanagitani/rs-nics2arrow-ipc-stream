@@ -1,6 +1,6 @@
 use arrow::array::{
-    Array, ArrayRef, BooleanArray, ListArray, StringArray, StringBuilder, StructArray,
-    UInt32Array, UInt64Array, UInt8Array,
+    Array, ArrayRef, BooleanArray, ListArray, StringArray, StringBuilder, StructArray, UInt8Array,
+    UInt32Array, UInt64Array,
 };
 use arrow::datatypes::{DataType, Field, Fields, Schema};
 use arrow::record_batch::RecordBatch;
@@ -101,7 +101,10 @@ pub fn ifaces2batch(interfaces: &[Interface]) -> Result<RecordBatch, arrow::erro
     RecordBatch::try_new(schema, columns)
 }
 
-fn to_columns(interfaces: &[Interface], schema: &Schema) -> Result<Vec<ArrayRef>, arrow::error::ArrowError> {
+fn to_columns(
+    interfaces: &[Interface],
+    schema: &Schema,
+) -> Result<Vec<ArrayRef>, arrow::error::ArrowError> {
     let mut columns: Vec<ArrayRef> = Vec::with_capacity(schema.fields().len());
     columns.push(Arc::new(UInt32Array::from_iter_values(
         interfaces.iter().map(|iface| iface.index),
@@ -110,21 +113,25 @@ fn to_columns(interfaces: &[Interface], schema: &Schema) -> Result<Vec<ArrayRef>
         interfaces.iter().map(|iface| &iface.name),
     )));
     columns.push(Arc::new(StringArray::from_iter(
-        interfaces.iter().map(|iface| iface.friendly_name.as_deref()),
+        interfaces
+            .iter()
+            .map(|iface| iface.friendly_name.as_deref()),
     )));
     columns.push(Arc::new(StringArray::from_iter(
         interfaces.iter().map(|iface| iface.description.as_deref()),
     )));
     columns.push(Arc::new(StringArray::from_iter_values(
-        interfaces.iter().map(|iface| format!("{:?}", iface.if_type)),
+        interfaces
+            .iter()
+            .map(|iface| format!("{:?}", iface.if_type)),
     )));
     columns.push(Arc::new(StringArray::from_iter(
         interfaces
             .iter()
             .map(|iface| iface.mac_addr.map(|mac| mac.to_string())),
     )));
-    columns.push(ipv4_to_arrow(&interfaces)?);
-    columns.push(ipv6_to_arrow(&interfaces)?);
+    columns.push(ipv4_to_arrow(interfaces)?);
+    columns.push(ipv6_to_arrow(interfaces)?);
     columns.push(Arc::new(UInt32Array::from_iter_values(
         interfaces.iter().map(|iface| iface.flags),
     )));
@@ -139,9 +146,9 @@ fn to_columns(interfaces: &[Interface], schema: &Schema) -> Result<Vec<ArrayRef>
     columns.push(Arc::new(UInt64Array::from_iter(
         interfaces.iter().map(|iface| iface.receive_speed),
     )));
-    columns.push(stats_to_arrow(&interfaces)?);
-    columns.push(gateway_to_arrow(&interfaces)?);
-    columns.push(dns_servers_to_arrow(&interfaces)?);
+    columns.push(stats_to_arrow(interfaces)?);
+    columns.push(gateway_to_arrow(interfaces)?);
+    columns.push(dns_servers_to_arrow(interfaces)?);
     columns.push(Arc::new(UInt32Array::from_iter(
         interfaces.iter().map(|iface| iface.mtu),
     )));
@@ -161,7 +168,9 @@ fn to_columns(interfaces: &[Interface], schema: &Schema) -> Result<Vec<ArrayRef>
         interfaces.iter().map(|iface| Some(iface.is_broadcast())),
     )));
     columns.push(Arc::new(BooleanArray::from_iter(
-        interfaces.iter().map(|iface| Some(iface.is_point_to_point())),
+        interfaces
+            .iter()
+            .map(|iface| Some(iface.is_point_to_point())),
     )));
     columns.push(Arc::new(BooleanArray::from_iter(
         interfaces.iter().map(|iface| Some(iface.is_tun())),
@@ -185,7 +194,8 @@ fn ipv4_to_arrow(interfaces: &[Interface]) -> Result<ArrayRef, arrow::error::Arr
             addrs.append_value(ipv4.addr().to_string());
             prefix_lens.append_value(ipv4.prefix_len());
         }
-        offsets.push(iface.ipv4.len() as i32 + *offsets.last().unwrap());
+        let last_offset = offsets[offsets.len() - 1];
+        offsets.push(iface.ipv4.len() as i32 + last_offset);
     }
 
     let addr_array = Arc::new(addrs.finish());
@@ -218,7 +228,8 @@ fn ipv6_to_arrow(interfaces: &[Interface]) -> Result<ArrayRef, arrow::error::Arr
             addrs.append_value(ipv6.addr().to_string());
             prefix_lens.append_value(ipv6.prefix_len());
         }
-        offsets.push(iface.ipv6.len() as i32 + *offsets.last().unwrap());
+        let last_offset = offsets[offsets.len() - 1];
+        offsets.push(iface.ipv6.len() as i32 + last_offset);
     }
 
     let addr_array = Arc::new(addrs.finish());
@@ -269,7 +280,9 @@ fn stats_to_arrow(interfaces: &[Interface]) -> Result<ArrayRef, arrow::error::Ar
     let struct_array = StructArray::try_new(
         fields,
         vec![rx_bytes_array, tx_bytes_array],
-        Some(arrow::buffer::NullBuffer::new(arrow::buffer::BooleanBuffer::from_iter(nulls))),
+        Some(arrow::buffer::NullBuffer::new(
+            arrow::buffer::BooleanBuffer::from_iter(nulls),
+        )),
     )?;
 
     Ok(Arc::new(struct_array))
@@ -289,16 +302,20 @@ fn gateway_to_arrow(interfaces: &[Interface]) -> Result<ArrayRef, arrow::error::
             for ip in &gateway.ipv4 {
                 ipv4_values.append_value(ip.to_string());
             }
-            ipv4_offsets.push(gateway.ipv4.len() as i32 + *ipv4_offsets.last().unwrap());
+            let last_ipv4_offset = ipv4_offsets[ipv4_offsets.len() - 1];
+            ipv4_offsets.push(gateway.ipv4.len() as i32 + last_ipv4_offset);
             for ip in &gateway.ipv6 {
                 ipv6_values.append_value(ip.to_string());
             }
-            ipv6_offsets.push(gateway.ipv6.len() as i32 + *ipv6_offsets.last().unwrap());
+            let last_ipv6_offset = ipv6_offsets[ipv6_offsets.len() - 1];
+            ipv6_offsets.push(gateway.ipv6.len() as i32 + last_ipv6_offset);
             nulls.push(true);
         } else {
             mac_addrs.append_null();
-            ipv4_offsets.push(*ipv4_offsets.last().unwrap());
-            ipv6_offsets.push(*ipv6_offsets.last().unwrap());
+            let last_ipv4_offset = ipv4_offsets[ipv4_offsets.len() - 1];
+            ipv4_offsets.push(last_ipv4_offset);
+            let last_ipv6_offset = ipv6_offsets[ipv6_offsets.len() - 1];
+            ipv6_offsets.push(last_ipv6_offset);
             nulls.push(false);
         }
     }
@@ -329,8 +346,14 @@ fn gateway_to_arrow(interfaces: &[Interface]) -> Result<ArrayRef, arrow::error::
 
     let struct_array = StructArray::try_new(
         fields,
-        vec![mac_addrs_array, Arc::new(ipv4_list_array), Arc::new(ipv6_list_array)],
-        Some(arrow::buffer::NullBuffer::new(arrow::buffer::BooleanBuffer::from_iter(nulls))),
+        vec![
+            mac_addrs_array,
+            Arc::new(ipv4_list_array),
+            Arc::new(ipv6_list_array),
+        ],
+        Some(arrow::buffer::NullBuffer::new(
+            arrow::buffer::BooleanBuffer::from_iter(nulls),
+        )),
     )?;
 
     Ok(Arc::new(struct_array))
@@ -344,7 +367,8 @@ fn dns_servers_to_arrow(interfaces: &[Interface]) -> Result<ArrayRef, arrow::err
         for ip in &iface.dns_servers {
             values.append_value(ip.to_string());
         }
-        offsets.push(iface.dns_servers.len() as i32 + *offsets.last().unwrap());
+        let last_offset = offsets[offsets.len() - 1];
+        offsets.push(iface.dns_servers.len() as i32 + last_offset);
     }
 
     let values_array = Arc::new(values.finish());
